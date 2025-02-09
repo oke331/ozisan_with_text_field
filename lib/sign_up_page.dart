@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 
 class OzisanPage extends HookWidget {
@@ -26,28 +27,27 @@ class OzisanPage extends HookWidget {
     // 画像の高さを取得する処理
     useEffect(
       () {
-        // 画像の読み込み完了を待つ
-        final image = Image.asset('assets/ozisan.png').image;
-        final imageStream = image.resolve(ImageConfiguration.empty);
+        // ③ 画像の高さを取得する
+        //
+        // 画像のレンダリング完了後、確実に高さを取得する
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          void measureHeight() {
+            final renderBox =
+                imageKey.currentContext?.findRenderObject() as RenderBox?;
+            final height = renderBox?.size.height ?? 0.0;
+            if (height > 0) {
+              imageHeight.value = height;
+            } else {
+              // 高さが0の場合、次のフレームで再試行
+              SchedulerBinding.instance.addPostFrameCallback((_) {
+                measureHeight();
+              });
+            }
+          }
 
-        final listener = ImageStreamListener(
-          (ImageInfo info, bool _) {
-            // ③ 画像の高さを取得する
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              final renderBox =
-                  imageKey.currentContext?.findRenderObject() as RenderBox?;
-              imageHeight.value = renderBox?.size.height ?? 0.0;
-            });
-          },
-          onError: (dynamic exception, StackTrace? stackTrace) {
-            // エラー処理
-          },
-        );
-
-        imageStream.addListener(listener);
-        return () {
-          imageStream.removeListener(listener);
-        };
+          measureHeight();
+        });
+        return null;
       },
       const [],
     );
