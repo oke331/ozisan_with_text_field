@@ -17,9 +17,6 @@ class OzisanPage extends HookWidget {
     // ① デバイスの高さを取得
     final deviceHeight = MediaQuery.sizeOf(context).height;
 
-    // ⑥ キーボードの高さを `viewInsets` から取得
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-
     final textEditingController = useTextEditingController();
     final focusNode = useFocusNode();
     final scrollController = useScrollController();
@@ -55,30 +52,6 @@ class OzisanPage extends HookWidget {
       const [],
     );
 
-    // キーボードの表示状態に応じてスクロールする処理
-    useEffect(
-      () {
-        final observer = _KeyboardVisibilityListener(
-          onKeyboardVisibilityChanged: () {
-            // ⑧ キーボードが表示されたら一番下までスクロールをしてテキスト入力がしやすいようにする
-            //
-            // これにより、キーボードが表示されている最中に最下部の表示を保持できる。
-            // ※Androidで初回のみキーボードに追従しないことがあるので、
-            //  レイアウトの再計算を待ってからスクロールを実行。
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              final maxScrollExtent = scrollController.position.maxScrollExtent;
-              scrollController.jumpTo(maxScrollExtent);
-            });
-          },
-        );
-        WidgetsBinding.instance.addObserver(observer);
-        return () {
-          WidgetsBinding.instance.removeObserver(observer);
-        };
-      },
-      const [],
-    );
-
     // テキストフィールドにフォーカスが当たっている状態を管理する処理
     useEffect(
       () {
@@ -98,7 +71,6 @@ class OzisanPage extends HookWidget {
     return GestureDetector(
       onTap: () => primaryFocus?.unfocus(),
       child: Scaffold(
-        resizeToAvoidBottomInset: false,
         body: SingleChildScrollView(
           controller: scrollController,
           child: Padding(
@@ -106,7 +78,7 @@ class OzisanPage extends HookWidget {
             child: SizedBox(
               // ② スマホ画面の高さに応じたUIを描画する
               //
-              // ⑤ スマホ画面の大きさの制約を除く（これでキーボードを表示しても画像が小さくなりません）
+              // ⑤ スマホ画面の大きさの制約を除く（キーボードが開かれた際、下部のWidgetが切り替わり余分な余白が生まれるのを避けるためです）
               height: imageHeight.value == 0.0 ? deviceHeight : null,
               child: Column(
                 children: [
@@ -146,6 +118,10 @@ class OzisanPage extends HookWidget {
                     decoration: InputDecoration(
                       hintText: '褒め言葉を入力',
                     ),
+                    // ⑥ キーボード表示で最下部までスクロールされるようにする。（下部のWidgetは可変で高さが取得できないので、大きい値を使用しています）
+                    scrollPadding: EdgeInsets.only(
+                      bottom: deviceHeight,
+                    ),
                   ),
                   const SizedBox(height: 32),
                   if (isFocused.value) ...[
@@ -176,10 +152,8 @@ class OzisanPage extends HookWidget {
                     ),
                   ],
                   SizedBox(
-                    // ⑦ `viewInsets`の値を使用してスクロール画面の一番下にキーボード表示用のスペースを設ける
-                    //
                     // セーフエリアのない端末の場合はUIの微調整をする
-                    height: bottomInset + max(safeAreaPadding.bottom, 16),
+                    height: max(safeAreaPadding.bottom, 16),
                   ),
                 ],
               ),
@@ -188,18 +162,5 @@ class OzisanPage extends HookWidget {
         ),
       ),
     );
-  }
-}
-
-/// キーボードの表示状態を監視するクラス
-class _KeyboardVisibilityListener extends WidgetsBindingObserver {
-  _KeyboardVisibilityListener({
-    required this.onKeyboardVisibilityChanged,
-  });
-  final void Function() onKeyboardVisibilityChanged;
-
-  @override
-  void didChangeMetrics() {
-    onKeyboardVisibilityChanged();
   }
 }
